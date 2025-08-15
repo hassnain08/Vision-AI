@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>🧠 Screen Analyzer</title>
+  <style>
+    body {
+      background: #f0f2f5;
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 700px;
+      max-width: 95%;
+      background-color: white;
+      padding: 30px;
+      border-radius: 14px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      position: relative;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 26px;
+      margin-bottom: 10px;
+    }
+
+    h1::before {
+      content: "🧠";
+      margin-right: 10px;
+    }
+
+    .images {
+      margin: 30px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .images img {
+      width: 100%;
+      max-height: 450px;
+      object-fit: contain;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .chat {
+      max-height: 350px;
+      overflow-y: auto;
+      margin-bottom: 20px;
+      background: #f9f9f9;
+      padding: 15px;
+      border-radius: 10px;
+    }
+
+    .chat .message {
+      margin-bottom: 20px;
+    }
+
+    .chat .user {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .chat .ai {
+      white-space: pre-line;
+      color: #333;
+    }
+
+    audio {
+      display: none;
+    }
+
+    .floating-controls {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .circle-btn {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background-color: #4b7bec;
+      color: white;
+      font-size: 22px;
+      border: none;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .circle-btn:hover {
+      background-color: #3867d6;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Screen Analyzer</h1>
+
+    <div class="chat" id="chatWindow"></div>
+    <audio id="player" autoplay></audio>
+  </div>
+
+  <!-- Mic & Stop Audio floating buttons -->
+  <div class="floating-controls">
+    <button class="circle-btn" onclick="startVoice()">🎤</button>
+    <button class="circle-btn" onclick="stopAudio()">🔇</button>
+  </div>
+
+  <script>
+    const chatWindow = document.getElementById("chatWindow");
+    const audioPlayer = document.getElementById("player");
+
+    function appendMessage(role, text) {
+      const msg = document.createElement("div");
+      msg.classList.add("message");
+
+      const icon = role === 'user' ? '🧑' : '🤖';
+      const label = role === 'user' ? 'You' : 'Assistant';
+
+      msg.innerHTML = `
+        <div class="user">${icon} ${label}:</div>
+        <div class="ai">${text}</div>
+      `;
+
+      chatWindow.appendChild(msg);
+      chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
+    function stopAudio() {
+      audioPlayer.pause();
+      audioPlayer.currentTime = 0;
+    }
+
+let recognition;
+let isListening = false;
+
+function startVoice() {
+  if (isListening) {
+    recognition.stop();
+    isListening = false;
+    return;
+  }
+
+  recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+  recognition.lang = "en-US";
+  recognition.interimResults = false;
+  recognition.continuous = true; 
+
+  isListening = true;
+
+  appendMessage("user", "🎙 Listening... Speak freely.");
+  recognition.start();
+
+  recognition.onresult = (event) => {
+    const text = event.results[event.results.length - 1][0].transcript;
+    appendMessage("user", text);
+    analyzePrompt(text);
+    isListening = false;
+    recognition.stop();
+  };
+
+  recognition.onerror = () => {
+    appendMessage("ai", "❌ Voice error. Try again.");
+    isListening = false;
+  };
+
+  recognition.onend = () => {
+    if (isListening) {
+      recognition.start(); // Optional: auto-resume
+    }
+  };
+}
+
+    function analyzePrompt(prompt) {
+      fetch("/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.error) {
+          appendMessage("ai", `❌ ${data.error}`);
+          return;
+        }
+
+        appendMessage("ai", data.answer);
+        audioPlayer.src = data.audio_path;
+        audioPlayer.play();
+      })
+      .catch(() => {
+        appendMessage("ai", "❌ Server error.");
+      });
+    }
+  </script>
+</body>
+</html>
