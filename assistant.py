@@ -3,7 +3,9 @@ import os
 from dotenv import load_dotenv
 import google.generativeai as genai
 from PIL import Image
+from screen_capture import capture_screenshot
 
+# Load API key
 load_dotenv()
 api_key = os.getenv("GOOGLE_API_KEY")
 
@@ -13,19 +15,22 @@ if not api_key:
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-2.0-flash")
 
-# Load static image paths (update these paths!)
-IMAGE_1_PATH = "static/graph1.png"
-IMAGE_2_PATH = "static/graph2.png"
-
 def analyze_screen_with_prompt(prompt: str) -> str:
     try:
-        image1 = Image.open(IMAGE_1_PATH)
-        image2 = Image.open(IMAGE_2_PATH)
+        # 1. Capture screenshot
+        screenshot_path = "live_screen.png"
+        capture_screenshot(screenshot_path)
 
-        print("⏳ Sending to Gemini...")
-        response = model.generate_content([prompt, image1, image2])
+        # 2. Load image
+        image = Image.open(screenshot_path)
+
+        # 3. Send to Gemini
+        print("⏳ Sending to Gemini with screenshot...")
+        response = model.generate_content([prompt, image])
+
+        # 4. Return text response
         return response.text.strip()
 
     except Exception as e:
         print(f"❌ Gemini error: {e}")
-        return "Failed to analyze images."
+        return "Failed to analyze screenshot with prompt."
